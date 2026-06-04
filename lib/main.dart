@@ -12,7 +12,7 @@ class MdmTestApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'MDM Test',
+      title: 'MDM Sandbox',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark(useMaterial3: true),
       home: const HomePage(),
@@ -122,7 +122,7 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('MDM Test App'),
+        title: const Text('MDM Sandbox App'),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadStatus),
         ],

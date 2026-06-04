@@ -1,4 +1,4 @@
-# MDM Test App
+# MDM Sandbox
 
 Package: `com.mdm.test`
 
