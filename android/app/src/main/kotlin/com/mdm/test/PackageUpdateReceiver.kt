@@ -6,12 +6,12 @@ import android.content.Intent
 
 class PackageUpdateReceiver : BroadcastReceiver() {
   override fun onReceive(context: Context, intent: Intent) {
-    if (intent.action == Intent.ACTION_MY_PACKAGE_REPLACED) {
-      val launch = Intent(context, MainActivity::class.java).apply {
-        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
-        putExtra("launch_reason", "app_updated")
+    if (intent.action != Intent.ACTION_MY_PACKAGE_REPLACED) return
+    // startActivity() is BAL-blocked on Android 10+ from static receivers — use service instead
+    context.startForegroundService(
+      Intent(context, MdmForegroundService::class.java).apply {
+        putExtra("action", "bring_to_front")
       }
-      context.startActivity(launch)
-    }
+    )
   }
 }

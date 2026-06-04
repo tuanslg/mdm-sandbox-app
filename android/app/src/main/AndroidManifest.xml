@@ -1,8 +1,12 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
-    <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_DATA_SYNC" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.USE_FULL_SCREEN_INTENT" />
+    <!-- Exempts app from Background Activity Launch (BAL) limits → startActivity() works from background -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:label="MDM Sandbox"
@@ -39,16 +43,6 @@
             </intent-filter>
         </receiver>
 
-        <!-- Managed Config receiver (AMAPI managedConfiguration changes) -->
-        <receiver
-            android:name=".ManagedConfigReceiver"
-            android:enabled="true"
-            android:exported="false">
-            <intent-filter>
-                <action android:name="android.intent.action.APPLICATION_RESTRICTIONS_CHANGED" />
-            </intent-filter>
-        </receiver>
-
         <!-- Package replaced / updated receiver -->
         <receiver
             android:name=".PackageUpdateReceiver"
@@ -72,10 +66,18 @@
                 android:resource="@xml/device_admin_policy" />
         </receiver>
 
+        <!-- MDM Foreground Service — keeps process alive for background activity start -->
+        <service
+            android:name=".MdmForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
         <meta-data
             android:name="flutterEmbedding"
             android:value="2" />
     </application>
+
+    <uses-permission android:name="android.permission.QUERY_ALL_PACKAGES" />
 
     <queries>
         <intent>

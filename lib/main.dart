@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'kiosk_bridge.dart';
+import 'device_info_page.dart';
 
 void main() {
   runApp(const MdmTestApp());
@@ -37,6 +38,7 @@ class _HomePageState extends State<HomePage> {
   String _log = '';
   bool _loading = true;
   StreamSubscription<Map<String, dynamic>>? _eventSub;
+  final _pkgController = TextEditingController(text: 'com.mdm.test');
 
   @override
   void initState() {
@@ -48,6 +50,7 @@ class _HomePageState extends State<HomePage> {
   @override
   void dispose() {
     _eventSub?.cancel();
+    _pkgController.dispose();
     super.dispose();
   }
 
@@ -64,6 +67,8 @@ class _HomePageState extends State<HomePage> {
             final reason = event['reason'] as String? ?? 'unknown';
             setState(() => _launchReason = reason);
             _appendLog('Launch reason updated: $reason');
+          case 'mdm_command':
+            _handleMdmCommand(event);
         }
       },
       onError: (e) => _appendLog('EventChannel error: $e'),
@@ -100,6 +105,38 @@ class _HomePageState extends State<HomePage> {
     setState(() => _log = '[$ts] $msg\n$_log');
   }
 
+  Future<void> _testLaunchApp() async {
+    final pkg = _pkgController.text.trim();
+    if (pkg.isEmpty) return;
+    try {
+      await KioskBridge.launchApp(pkg);
+      _appendLog('launch_app OK: $pkg');
+    } catch (e) {
+      _appendLog('launch_app FAILED: $e');
+    }
+  }
+
+  Future<void> _handleMdmCommand(Map<String, dynamic> event) async {
+    final action = event['action'] as String?;
+    final config = Map<String, String>.from(event['config'] as Map? ?? {});
+    setState(() => _managedConfig = config);
+    _appendLog('MDM command received: action=$action | config=$config');
+    switch (action) {
+      case 'launch_app':
+        final pkg = config['target_package'];
+        if (pkg != null && pkg.isNotEmpty) {
+          try {
+            await KioskBridge.launchApp(pkg);
+            _appendLog('launch_app: started $pkg');
+          } catch (e) {
+            _appendLog('launch_app FAILED: $e');
+          }
+        } else {
+          _appendLog('launch_app: missing target_package');
+        }
+    }
+  }
+
   Future<void> _enterKiosk() async {
     try {
       await KioskBridge.enterKiosk();
@@ -125,6 +162,13 @@ class _HomePageState extends State<HomePage> {
         title: const Text('MDM Sandbox App'),
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _loadStatus),
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const DeviceInfoPage()),
+            ),
+          ),
         ],
       ),
       body: _loading
@@ -143,6 +187,11 @@ class _HomePageState extends State<HomePage> {
                   ),
                   const SizedBox(height: 8),
                   _ManagedConfigCard(config: _managedConfig),
+                  const SizedBox(height: 8),
+                  _LaunchTestSection(
+                    controller: _pkgController,
+                    onLaunch: _testLaunchApp,
+                  ),
                   const SizedBox(height: 8),
                   Row(
                     children: [
@@ -286,6 +335,54 @@ class _ManagedConfigCard extends StatelessWidget {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _LaunchTestSection extends StatelessWidget {
+  const _LaunchTestSection({required this.controller, required this.onLaunch});
+
+  final TextEditingController controller;
+  final VoidCallback onLaunch;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Test Launch App', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    style: const TextStyle(fontFamily: 'monospace', fontSize: 13),
+                    decoration: const InputDecoration(
+                      labelText: 'Package name',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: onLaunch,
+                  child: const Text('Launch'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'com.mdm.test = self  •  thay bằng package app khác để test',
+              style: TextStyle(fontSize: 11, color: Colors.white54),
+            ),
           ],
         ),
       ),

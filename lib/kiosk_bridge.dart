@@ -26,6 +26,14 @@ class KioskBridge {
   static Stream<Map<String, dynamic>> get mdmEventStream =>
       _events.receiveBroadcastStream().map((e) => Map<String, dynamic>.from(e as Map));
 
+  static Future<Map<String, String>> getDeviceInfo() async {
+    final res = await _ch.invokeMapMethod<String, String>('getDeviceInfo');
+    return res ?? {};
+  }
+
+  static Future<void> launchApp(String packageName) =>
+      _ch.invokeMethod('launchApp', {'packageName': packageName});
+
   static Future<void> enterKiosk() => _ch.invokeMethod('enterKiosk');
   static Future<void> exitKiosk() => _ch.invokeMethod('exitKiosk');
 }
