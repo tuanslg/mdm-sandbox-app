@@ -1,10 +1,24 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:sentry_flutter/sentry_flutter.dart';
 import 'kiosk_bridge.dart';
 import 'device_info_page.dart';
+import 'sentry_config.dart';
 
-void main() {
-  runApp(const MdmTestApp());
+Future<void> main() async {
+  if (!sentryEnabled) {
+    // No DSN provided — run the app normally without Sentry.
+    runApp(const MdmTestApp());
+    return;
+  }
+
+  await SentryFlutter.init(
+    configureSentry,
+    appRunner: () => runApp(SentryWidget(child: const MdmTestApp())),
+  );
+
+  // TEMP: verify Sentry transport works. Remove after confirming on dashboard.
+  await Sentry.captureMessage('Sentry smoke test from mdm_test_app');
 }
 
 class MdmTestApp extends StatelessWidget {
@@ -71,7 +85,10 @@ class _HomePageState extends State<HomePage> {
             _handleMdmCommand(event);
         }
       },
-      onError: (e) => _appendLog('EventChannel error: $e'),
+      onError: (e, st) {
+        _appendLog('EventChannel error: $e');
+        _report(e, st);
+      },
     );
   }
 
@@ -92,10 +109,17 @@ class _HomePageState extends State<HomePage> {
         _managedConfig = config;
         _loading = false;
       });
-    } catch (e) {
+    } catch (e, st) {
       _appendLog('Error loading status: $e');
+      _report(e, st);
       setState(() => _loading = false);
     }
+  }
+
+  /// Reports a caught error to Sentry (no-op when DSN is not configured).
+  void _report(Object error, [StackTrace? stack]) {
+    if (!sentryEnabled) return;
+    unawaited(Sentry.captureException(error, stackTrace: stack));
   }
 
   void _appendLog(String msg) {
@@ -111,8 +135,9 @@ class _HomePageState extends State<HomePage> {
     try {
       await KioskBridge.launchApp(pkg);
       _appendLog('launch_app OK: $pkg');
-    } catch (e) {
+    } catch (e, st) {
       _appendLog('launch_app FAILED: $e');
+      _report(e, st);
     }
   }
 
@@ -128,8 +153,9 @@ class _HomePageState extends State<HomePage> {
           try {
             await KioskBridge.launchApp(pkg);
             _appendLog('launch_app: started $pkg');
-          } catch (e) {
+          } catch (e, st) {
             _appendLog('launch_app FAILED: $e');
+            _report(e, st);
           }
         } else {
           _appendLog('launch_app: missing target_package');
@@ -141,8 +167,9 @@ class _HomePageState extends State<HomePage> {
     try {
       await KioskBridge.enterKiosk();
       _appendLog('enterKiosk OK');
-    } catch (e) {
+    } catch (e, st) {
       _appendLog('enterKiosk FAILED: $e');
+      _report(e, st);
     }
   }
 
@@ -150,8 +177,9 @@ class _HomePageState extends State<HomePage> {
     try {
       await KioskBridge.exitKiosk();
       _appendLog('exitKiosk OK');
-    } catch (e) {
+    } catch (e, st) {
       _appendLog('exitKiosk FAILED: $e');
+      _report(e, st);
     }
   }
 
