@@ -18,7 +18,7 @@ Future<void> main() async {
   );
 
   // TEMP: verify Sentry transport works. Remove after confirming on dashboard.
-  await Sentry.captureMessage('Sentry smoke test from mdm_test_app');
+  // await Sentry.captureMessage('Sentry smoke test from mdm_test_app');
 }
 
 class MdmTestApp extends StatelessWidget {
@@ -53,6 +53,8 @@ class _HomePageState extends State<HomePage> {
   bool _loading = true;
   StreamSubscription<Map<String, dynamic>>? _eventSub;
   final _pkgController = TextEditingController(text: 'com.mdm.test');
+  final _logController = TextEditingController(text: 'MDM sandbox test log');
+  SentryLogLevel _logLevel = SentryLogLevel.info;
 
   @override
   void initState() {
@@ -65,6 +67,7 @@ class _HomePageState extends State<HomePage> {
   void dispose() {
     _eventSub?.cancel();
     _pkgController.dispose();
+    _logController.dispose();
     super.dispose();
   }
 
@@ -120,6 +123,40 @@ class _HomePageState extends State<HomePage> {
   void _report(Object error, [StackTrace? stack]) {
     if (!sentryEnabled) return;
     unawaited(Sentry.captureException(error, stackTrace: stack));
+  }
+
+  /// Sends a structured log to Sentry at the selected level.
+  /// Requires `enableLogs = true` (see sentry_config.dart) and a configured DSN.
+  Future<void> _sendLogToSentry() async {
+    final msg = _logController.text.trim();
+    if (msg.isEmpty) return;
+    if (!sentryEnabled) {
+      _appendLog('Sentry disabled (no DSN) — log not sent');
+      return;
+    }
+
+    final attributes = {
+      'source': SentryAttribute.string('mdm_sandbox_ui'),
+      'launch_reason': SentryAttribute.string(_launchReason),
+      'is_device_owner': SentryAttribute.bool(_isDeviceOwner),
+    };
+
+    switch (_logLevel) {
+      case SentryLogLevel.trace:
+        Sentry.logger.trace(msg, attributes: attributes);
+      case SentryLogLevel.debug:
+        Sentry.logger.debug(msg, attributes: attributes);
+      case SentryLogLevel.info:
+        Sentry.logger.info(msg, attributes: attributes);
+      case SentryLogLevel.warn:
+        Sentry.logger.warn(msg, attributes: attributes);
+      case SentryLogLevel.error:
+        Sentry.logger.error(msg, attributes: attributes);
+      case SentryLogLevel.fatal:
+        Sentry.logger.fatal(msg, attributes: attributes);
+    }
+
+    _appendLog('Sent ${_logLevel.name} log to Sentry: "$msg"');
   }
 
   void _appendLog(String msg) {
@@ -237,6 +274,13 @@ class _HomePageState extends State<HomePage> {
                         ),
                       ),
                     ],
+                  ),
+                  const SizedBox(height: 8),
+                  _SendLogSection(
+                    controller: _logController,
+                    level: _logLevel,
+                    onLevelChanged: (l) => setState(() => _logLevel = l),
+                    onSend: _sendLogToSentry,
                   ),
                   const SizedBox(height: 8),
                   const Text('Log:', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -363,6 +407,69 @@ class _ManagedConfigCard extends StatelessWidget {
                 ),
               ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _SendLogSection extends StatelessWidget {
+  const _SendLogSection({
+    required this.controller,
+    required this.level,
+    required this.onLevelChanged,
+    required this.onSend,
+  });
+
+  final TextEditingController controller;
+  final SentryLogLevel level;
+  final ValueChanged<SentryLogLevel> onLevelChanged;
+  final VoidCallback onSend;
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Send Log to Sentry', style: TextStyle(fontWeight: FontWeight.bold)),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: TextField(
+                    controller: controller,
+                    style: const TextStyle(fontSize: 13),
+                    decoration: const InputDecoration(
+                      labelText: 'Log message',
+                      isDense: true,
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                DropdownButton<SentryLogLevel>(
+                  value: level,
+                  onChanged: (l) => l != null ? onLevelChanged(l) : null,
+                  items: SentryLogLevel.values
+                      .map((l) => DropdownMenuItem(value: l, child: Text(l.name)))
+                      .toList(),
+                ),
+                const SizedBox(width: 8),
+                ElevatedButton(
+                  onPressed: onSend,
+                  child: const Text('Send'),
+                ),
+              ],
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Hiện trong Sentry dashboard → Logs (cần enableLogs + DSN)',
+              style: TextStyle(fontSize: 11, color: Colors.white54),
+            ),
           ],
         ),
       ),

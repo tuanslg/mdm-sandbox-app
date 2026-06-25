@@ -21,6 +21,19 @@ void configureSentry(SentryFlutterOptions options) {
   options.dsn = _dsn;
   options.environment = _environment;
 
+  // Structured logs (Sentry.logger.*). Visible under "Logs" in the dashboard.
+  options.enableLogs = true;
+
+  // TEMP debug: proves a log actually reaches the capture pipeline.
+  // If this never prints, enableLogs isn't active in the running build.
+  // Return the log unchanged so it's still sent. Remove once logs are verified.
+  if (!kReleaseMode) {
+    options.beforeSendLog = (log) {
+      debugPrint('[SentryLog] captured: level=${log.level} body="${log.body}"');
+      return log;
+    };
+  }
+
   // Performance tracing. Lower in production to control event volume.
   options.tracesSampleRate = kReleaseMode ? 0.2 : 1.0;
 
